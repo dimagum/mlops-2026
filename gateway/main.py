@@ -137,7 +137,7 @@ with open(
 def preprocess(img: Image.Image) -> np.ndarray:
     resize_size, resample = PREPROCESS_PARAMS[settings.cv_model]
     img = img.convert("RGB")
-    
+
     w, h = img.size
     if w <= h:
         new_w, new_h = resize_size, int(resize_size * h / w)
@@ -166,19 +166,26 @@ def get_triton_client() -> triton_aio.InferenceServerClient:
     return _triton_client
 
 
+def _prepare_input(data: bytes) -> np.ndarray:
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.load()
+    except Exception as e:
+        raise ValueError("not an image") from e
+    return preprocess(img)
+
+
 @app.post("/vision")
 async def vision(file: UploadFile = File(...), payload: dict = Depends(require_auth)) -> dict:
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")
     try:
-        img = Image.open(io.BytesIO(data))
-        img.load()
-    except Exception:
+        x = await anyio.to_thread.run_sync(_prepare_input, data)
+    except ValueError:
         raise HTTPException(status_code=400, detail="File is not a valid image")
 
     try:
-        x = await anyio.to_thread.run_sync(preprocess, img)
         inp = tritonhttp.InferInput("INPUT__0", list(x.shape), "FP32")
         inp.set_data_from_numpy(x)
         out = tritonhttp.InferRequestedOutput("OUTPUT__0")
