@@ -62,7 +62,7 @@ services:
       - VLLM_METRICS_URL=http://vllm:8000/metrics
       - NODE_METRICS_URL=http://node-exporter:9100/metrics
 
-      - GPU_NAME=NVIDIA GeForce RTX 5070 Ti
+      - GPU_NAME=${GPU_NAME:-NVIDIA GeForce RTX 3080}
     ports:
       - "${GATEWAY_PORT:-8080}:8080"
     depends_on:
